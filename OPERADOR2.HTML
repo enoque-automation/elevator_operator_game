@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>OPERADOR — Andar 0</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace}
+#c{display:block;width:100vw;height:100vh;cursor:crosshair}
+#overlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.93);z-index:100}
+#overlay.h{display:none}
+.scr{text-align:center;color:#fff;max-width:600px;padding:40px}
+.scr h1{font-size:3rem;letter-spacing:.45em;margin-bottom:18px;color:#fff;font-weight:400}
+.scr p{font-size:.82rem;line-height:2.1;color:#666;margin:3px 0}
+.scr .sub{font-size:.68rem;color:#333;letter-spacing:.14em;margin-top:22px;line-height:1.9}
+.scr button{margin-top:30px;padding:12px 48px;background:transparent;border:1px solid rgba(255,255,255,.3);color:#999;font-family:'Courier New',monospace;font-size:.78rem;letter-spacing:.22em;cursor:pointer;transition:all .35s}
+.scr button:hover{background:#fff;color:#000;border-color:#fff}
+#hud{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+#hud.h{display:none}
+#info{position:absolute;top:18px;left:18px;color:rgba(255,255,255,.35);font-size:.66rem;letter-spacing:.2em;line-height:2}
+#cross{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:5px;height:5px;background:rgba(255,255,255,.35);border-radius:50%}
+#hint{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font-size:.7rem;letter-spacing:.14em;text-align:center;white-space:nowrap}
+#alert{position:absolute;top:28%;left:50%;transform:translateX(-50%);color:#e00;font-size:1.5rem;letter-spacing:.38em;font-weight:700;text-shadow:0 0 22px #f00;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+#vig{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;opacity:0;transition:opacity .7s;background:radial-gradient(ellipse at center,transparent 40%,rgba(160,0,0,.6) 100%)}
+#vig.on{opacity:1;animation:vpulse 1.15s infinite}
+@keyframes vpulse{0%,100%{opacity:.65}50%{opacity:1}}
+#flash{position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;pointer-events:none;opacity:0;z-index:200;transition:opacity .08s}
+
+/* SPEECH SUBTITLE */
+#speech{
+  position:absolute;
+  bottom:72px;left:50%;
+  transform:translateX(-50%) translateY(10px);
+  max-width:560px;min-width:220px;
+  background:rgba(0,0,0,.84);
+  border-left:2px solid rgba(255,255,255,.18);
+  padding:11px 18px 11px 15px;
+  opacity:0;pointer-events:none;
+  transition:opacity .4s,transform .4s;
+  z-index:12;
+}
+#speech.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#speech.anom{border-left-color:rgba(200,0,0,.7);background:rgba(10,0,0,.88)}
+#sp-name{font-size:.6rem;letter-spacing:.22em;color:rgba(255,255,255,.3);margin-bottom:6px}
+#sp-txt{font-size:.87rem;color:#fff;line-height:1.65}
+
+/* FULL DIALOG */
+#dlg{
+  position:absolute;bottom:68px;left:50%;
+  transform:translateX(-50%);width:500px;
+  background:rgba(0,0,0,.92);border:1px solid rgba(255,255,255,.15);
+  padding:20px 24px;display:none;pointer-events:all;z-index:20;
+}
+#dlg.on{display:block}
+#dlg-name{color:rgba(255,255,255,.3);font-size:.62rem;letter-spacing:.24em;margin-bottom:9px}
+#dlg-txt{color:#ddd;font-size:.9rem;line-height:1.78;margin-bottom:14px}
+#dlg-hint{color:rgba(255,255,255,.24);font-size:.62rem;letter-spacing:.14em}
+
+/* ELEVATOR PANEL */
+#panel{
+  position:absolute;right:32px;top:50%;transform:translateY(-50%);
+  background:rgba(0,0,0,.87);border:1px solid rgba(255,255,255,.12);
+  padding:16px;display:none;pointer-events:all;z-index:20;
+}
+#panel.on{display:block}
+#panel h3{color:rgba(255,255,255,.28);font-size:.58rem;letter-spacing:.22em;margin-bottom:12px;text-align:center}
+.fb{display:block;width:52px;height:52px;margin:4px auto;background:#080808;border:1px solid #262626;color:#777;font-family:'Courier New',monospace;font-size:.8rem;cursor:pointer;transition:all .18s}
+.fb:hover{background:#181818;border-color:#666;color:#fff}
+.fb.sp{border-color:#1c3040;color:#4a7aaa}
+.fb.sp:hover{background:#0a1825;border-color:#4a7aaa}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vig"></div>
+<div id="flash"></div>
+
+<div id="overlay">
+  <div class="scr">
+    <h1>OPERADOR</h1>
+    <p style="color:#444;letter-spacing:.06em">Turno noturno — Andar 0</p>
+    <p class="sub">
+      WASD + Mouse — mover / olhar &nbsp;·&nbsp; SHIFT — correr<br>
+      E — interagir com passageiro &nbsp;·&nbsp; Clique — painel do elevador<br><br>
+      <span style="color:#282828">Observe. Analise. Decida.</span>
+    </p>
+    <button id="btn-start">INICIAR TURNO</button>
+  </div>
+</div>
+
+<div id="hud" class="h">
+  <div id="info">DIA <span id="d">1</span>/7 &nbsp;·&nbsp; PASSAGEIRO <span id="p">1</span>/5</div>
+  <div id="cross"></div>
+  <div id="hint"></div>
+  <div id="alert">⚠ ANOMALIA — CORRA ⚠</div>
+  <div id="speech"><div id="sp-name">—</div><div id="sp-txt"></div></div>
+  <div id="dlg">
+    <div id="dlg-name">PASSAGEIRO</div>
+    <div id="dlg-txt"></div>
+    <div id="dlg-hint">[E] fechar &nbsp;·&nbsp; use o painel ▶</div>
+  </div>
+  <div id="panel">
+    <h3>PAINEL</h3>
+    <button class="fb sp" onclick="G.pressBtn('open')">ABRIR</button>
+    <button class="fb sp" onclick="G.pressBtn('close')">FECHAR</button>
+    <button class="fb" onclick="G.pressBtn(5)">5</button>
+    <button class="fb" onclick="G.pressBtn(4)">4</button>
+    <button class="fb" onclick="G.pressBtn(3)">3</button>
+    <button class="fb" onclick="G.pressBtn(2)">2</button>
+    <button class="fb" onclick="G.pressBtn(1)">1</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// ======================================================
+//  AUDIO
+// ======================================================
+let AC=null;
+function getAC(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();return AC;}
+function tone(f,dur,type,vol,delay){
+  type=type||'sine';vol=vol||.1;delay=delay||0;
+  var ac=getAC(),o=ac.createOscillator(),g=ac.createGain();
+  o.connect(g);g.connect(ac.destination);o.type=type;o.frequency.value=f;
+  var t=ac.currentTime+delay;
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.start(t);o.stop(t+dur+.02);
+}
+function ding(){[523,659,784].forEach(function(f,i){tone(f,.3,'sine',.13,i*.15);});}
+function elevSound(dir){
+  var ac=getAC(),o=ac.createOscillator(),g=ac.createGain(),f=ac.createBiquadFilter();
+  o.connect(f);f.connect(g);g.connect(ac.destination);
+  f.type='lowpass';f.frequency.value=400;o.type='sawtooth';
+  o.frequency.setValueAtTime(dir==='up'?65:105,ac.currentTime);
+  o.frequency.linearRampToValueAtTime(dir==='up'?105:58,ac.currentTime+2.5);
+  g.gain.setValueAtTime(.055,ac.currentTime);g.gain.setValueAtTime(.055,ac.currentTime+2.1);
+  g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+2.7);
+  o.start();o.stop(ac.currentTime+2.8);
+}
+function heartbeat(){
+  var ac=getAC();
+  [0,.12].forEach(function(d){
+    var o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);o.type='sine';o.frequency.value=52;
+    var t=ac.currentTime+d;
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.32,t+.06);
+    g.gain.exponentialRampToValueAtTime(.0001,t+.24);
+    o.start(t);o.stop(t+.3);
+  });
+}
+function stepSnd(vol){
+  vol=vol||.18;
+  var ac=getAC(),sz=Math.floor(ac.sampleRate*.09),buf=ac.createBuffer(1,sz,ac.sampleRate);
+  var d=buf.getChannelData(0);
+  for(var i=0;i<sz;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(sz*.26));
+  var s=ac.createBufferSource(),g=ac.createGain(),filt=ac.createBiquadFilter();
+  filt.type='lowpass';filt.frequency.value=200;
+  s.buffer=buf;s.connect(filt);filt.connect(g);g.connect(ac.destination);
+  g.gain.value=vol;s.start();
+}
+function creak(){
+  var ac=getAC(),o=ac.createOscillator(),g=ac.createGain();
+  o.connect(g);g.connect(ac.destination);o.type='sawtooth';
+  o.frequency.setValueAtTime(160+Math.random()*80,ac.currentTime);
+  o.frequency.linearRampToValueAtTime(100+Math.random()*40,ac.currentTime+.35);
+  g.gain.setValueAtTime(.07,ac.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.45);
+  o.start();o.stop(ac.currentTime+.5);
+}
+var _ambOsc=null;
+function startAmb(){
+  if(_ambOsc)return;var ac=getAC();
+  _ambOsc=ac.createOscillator();var g=ac.createGain();
+  _ambOsc.connect(g);g.connect(ac.destination);_ambOsc.type='sine';_ambOsc.frequency.value=36;
+  g.gain.value=.038;_ambOsc.start();
+}
+function setTension(hi){if(_ambOsc)_ambOsc.frequency.value=hi?60:36;}
+
+// ======================================================
+//  THREE.JS
+// ======================================================
+var canvas=document.getElementById('c');
+var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0xf2f2f2);
+scene.fog=new THREE.Fog(0xf2f2f2,18,55);
+
+var cam=new THREE.PerspectiveCamera(76,innerWidth/innerHeight,.04,90);
+cam.rotation.order='YXZ';
+
+window.addEventListener('resize',function(){
+  cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+// ======================================================
+//  MATERIALS
+// ======================================================
+var M={
+  wall:  new THREE.MeshLambertMaterial({color:0xeeeeee}),
+  floor: new THREE.MeshLambertMaterial({color:0xdedede}),
+  ceil:  new THREE.MeshLambertMaterial({color:0xfafafa}),
+  metal: new THREE.MeshLambertMaterial({color:0x8c8c8c}),
+  dark:  new THREE.MeshLambertMaterial({color:0x181818}),
+  lum:   new THREE.MeshLambertMaterial({color:0xffffee,emissive:0xffffcc,emissiveIntensity:.7}),
+  stair: new THREE.MeshLambertMaterial({color:0xcfcfcf}),
+  blood: new THREE.MeshLambertMaterial({color:0x4a0000}),
+};
+
+var worldGrp=new THREE.Group(),corrGrp=new THREE.Group();
+scene.add(worldGrp,corrGrp);
+scene.add(new THREE.AmbientLight(0xffffff,.38));
+
+var flickerLights=[];
+
+function mkBox(w,h,d,mat,x,y,z){
+  var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z);return m;
+}
+
+// ======================================================
+//  ELEVATOR A
+// ======================================================
+function buildElevatorA(){
+  while(worldGrp.children.length)worldGrp.remove(worldGrp.children[0]);
+  worldGrp.add(mkBox(2.4,.12,3.2,M.floor,0,-.06,1.4));
+  worldGrp.add(mkBox(2.4,.1, 3.2,M.ceil, 0,3.02,1.4));
+  worldGrp.add(mkBox(2.4,3.1,.1, M.metal,0,1.5, 3.0));
+  worldGrp.add(mkBox(.1, 3.1,3.2,M.metal,-1.2,1.5,1.4));
+  worldGrp.add(mkBox(.1, 3.1,3.2,M.metal, 1.2,1.5,1.4));
+  worldGrp.add(mkBox(2.4,.24,.1,M.dark,0,2.88,.05));
+  [-1.1,1.1].forEach(function(x){worldGrp.add(mkBox(.14,2.88,.1,M.dark,x,1.44,.05));});
+  var pl=new THREE.PointLight(0xfaf8f0,1.7,8);pl.position.set(0,2.8,1.5);worldGrp.add(pl);
+  worldGrp.add(mkBox(.9,.04,.15,M.lum,0,2.97,1.5));
+  worldGrp.add(mkBox(.42,.22,.04,M.dark,0,2.58,.07));
+  worldGrp.add(mkBox(1.8,.06,.07,M.metal,0,.95,2.96));
+  worldGrp.add(mkBox(2,.22*6,.04,new THREE.MeshLambertMaterial({color:0xbcbcbc}),0,1.5,2.95));
+}
+
+// ======================================================
+//  CORRIDOR
+// ======================================================
+var elevBZ=-26;
+
+function addCL(z,intensity,flicker){
+  var pl=new THREE.PointLight(0xffffff,intensity,9);
+  pl.position.set(0,2.75,z);corrGrp.add(pl);
+  corrGrp.add(mkBox(.7,.04,.08,M.lum,0,2.97,z));
+  flickerLights.push({light:pl,flicker:!!flicker,baseInt:intensity});
+}
+
+function buildCorridor(len,wid,anomCnt){
+  while(corrGrp.children.length)corrGrp.remove(corrGrp.children[0]);
+  flickerLights=[];elevBZ=-len;
+  var L=len;
+  // EW = elevator inner width (between outer walls at ±1.2, so EW=2.4)
+  // Corridor walls sit at same X as elevator side walls for seamless join
+  var EW=2.4;  // fixed outer width — walls at ±1.2
+  var WALLW=0.1; // wall thickness
+  var walkable=wid; // shrinks with anomalies, for obstacle calc
+
+  // Base surfaces — width matches elevator exactly
+  corrGrp.add(mkBox(EW,.12,L,M.floor,0,-.06,-L/2));
+  corrGrp.add(mkBox(EW,.1, L,M.ceil, 0,3.02,-L/2));
+  corrGrp.add(mkBox(WALLW,3.1,L,M.wall,-EW/2+WALLW/2,1.5,-L/2));
+  corrGrp.add(mkBox(WALLW,3.1,L,M.wall, EW/2-WALLW/2,1.5,-L/2));
+
+  for(var z=-4;z>-L;z-=6.5)addCL(z,.85,false);
+
+  if(anomCnt>=1){
+    // Bottleneck: inner walls that narrow the passage
+    var bz=-L*.34;
+    var blockW=(EW-walkable)*.5;
+    if(blockW>0.05){
+      corrGrp.add(mkBox(blockW,3.1,3.8,M.wall,-EW/2+WALLW+blockW/2,1.5,bz));
+      corrGrp.add(mkBox(blockW,3.1,3.8,M.wall, EW/2-WALLW-blockW/2,1.5,bz));
+    }
+    corrGrp.add(mkBox(.04,.4,.32,M.blood,-EW/2+.06,1.5,bz-.6));
+  }
+  if(anomCnt>=2){
+    var sz2=-L*.5,rlen=10,steps=8;
+    for(var i=0;i<steps;i++){
+      var pz=sz2-i*(rlen/steps),py=-i*(rlen/steps)*Math.sin(.14)*.55;
+      corrGrp.add(mkBox(EW-WALLW*2,.14,rlen/steps,M.stair,0,py,pz));
+      corrGrp.add(mkBox(EW-WALLW*2,.16*(i+1),.12,M.stair,0,py-.08*i,pz+rlen/steps*.5));
+    }
+    corrGrp.add(mkBox(EW,.1,rlen,new THREE.MeshLambertMaterial({color:0xe0e0e0}),0,2.05,sz2-rlen/2));
+    addCL(sz2-4,.6,false);
+  }
+  if(anomCnt>=3){
+    var cz=-L*.68;
+    var hw=Math.max((EW-walkable*.8)*.5,.2);
+    corrGrp.add(mkBox(hw,3.1,.22,M.wall,-EW/2+WALLW+hw/2,1.5,cz));
+    corrGrp.add(mkBox(hw,3.1,.22,M.wall, EW/2-WALLW-hw/2,1.5,cz-4.5));
+    addCL(cz-2,.5,true);
+  }
+  if(anomCnt>=4){
+    var nz=-L*.8;
+    var nw=Math.max((EW-walkable*.65)*.5,.3);
+    corrGrp.add(mkBox(nw,3.1,4.5,M.wall,-EW/2+WALLW+nw/2,1.5,nz));
+    corrGrp.add(mkBox(nw,3.1,4.5,M.wall, EW/2-WALLW-nw/2,1.5,nz));
+    addCL(nz,.42,true);
+  }
+  if(anomCnt>=5){
+    var cz2=-L*.9;
+    var hw2=Math.max((EW-walkable*.5)*.5,.3);
+    corrGrp.add(mkBox(hw2,3.1,.2,M.wall,-EW/2+WALLW+hw2/2,1.5,cz2));
+    corrGrp.add(mkBox(hw2,3.1,.2,M.wall, EW/2-WALLW-hw2/2,1.5,cz2-3.5));
+  }
+  buildElevatorB(-len);
+}
+
+function buildElevatorB(z){
+  corrGrp.add(mkBox(2.4,.12,3.2,M.floor,0,-.06,z-1.4));
+  corrGrp.add(mkBox(2.4,.1, 3.2,M.ceil, 0,3.02,z-1.4));
+  corrGrp.add(mkBox(2.4,3.1,.1, M.metal,0,1.5, z-2.9));
+  corrGrp.add(mkBox(.1, 3.1,3.2,M.metal,-1.2,1.5,z-1.4));
+  corrGrp.add(mkBox(.1, 3.1,3.2,M.metal, 1.2,1.5,z-1.4));
+  corrGrp.add(mkBox(2.4,.24,.1,M.dark,0,2.88,z-.04));
+  [-1.1,1.1].forEach(function(x){corrGrp.add(mkBox(.14,2.88,.1,M.dark,x,1.44,z-.04));});
+  var pl2=new THREE.PointLight(0xfaf8f0,1.4,7);pl2.position.set(0,2.8,z-1.4);corrGrp.add(pl2);
+  corrGrp.add(mkBox(.9,.04,.14,M.lum,0,2.97,z-1.4));
+}
+
+// ======================================================
+//  ANOMALY TYPES
+// ======================================================
+var ANOM={NONE:0,NECK:1,ARMS:2,HEAD:3,EYES:4,TILT:5,SPEECH:6};
+// SPEECH = physically normal, just says wrong things
+
+// ======================================================
+//  CHARACTER BUILDER
+// ======================================================
+function buildHuman(opts){
+  opts=opts||{};
+  var skin=opts.skin||0xffcba4,anom=opts.anom||0,female=!!opts.female;
+  var tops=[0x1e3a6e,0x4a1515,0x1a3a1a,0x383060,0x2a2a2a,0x3a2d1c];
+  var top=tops[Math.floor(Math.random()*tops.length)];
+  var hair=Math.random()>.4?0x111111:0x3d2b1f;
+
+  var g=new THREE.Group();
+  var sk=new THREE.MeshLambertMaterial({color:skin});
+  var hm=new THREE.MeshLambertMaterial({color:hair});
+  var tm=new THREE.MeshLambertMaterial({color:top});
+  var bm=new THREE.MeshLambertMaterial({color:0x1a1a2e});
+  var shoe=new THREE.MeshLambertMaterial({color:0x111111});
+  var eyeCol=(anom&&anom!==ANOM.SPEECH&&Math.random()>.6)?0xcc0000:0x080808;
+  var em=new THREE.MeshLambertMaterial({color:eyeCol});
+
+  var neckH  =anom===ANOM.NECK?  .48:.1;
+  var headSc =anom===ANOM.HEAD? 1.42:1;
+  var armLen =anom===ANOM.ARMS?  .82:.5;
+  var eyeSp  =anom===ANOM.EYES? .145:.058;
+  var torsoW =female?.28:.36;
+
+  // Torso
+  var torso=new THREE.Mesh(new THREE.BoxGeometry(torsoW,.60,.19),tm);
+  torso.position.y=1.22;g.add(torso);
+
+  // Neck
+  var neck=new THREE.Mesh(new THREE.CylinderGeometry(.053,.053,neckH,8),sk);
+  neck.position.y=1.57+neckH/2;g.add(neck);
+
+  // Head
+  var headY=1.57+neckH+.135*headSc;
+  var head=new THREE.Mesh(new THREE.SphereGeometry(.135*headSc,14,14),sk);
+  head.position.y=headY;
+  if(anom===ANOM.TILT)head.rotation.z=.38;
+  g.add(head);
+
+  // Hair
+  var hairTop=new THREE.Mesh(new THREE.SphereGeometry(.14*headSc,14,14,0,Math.PI*2,0,Math.PI*.52),hm);
+  hairTop.position.y=headY;g.add(hairTop);
+  var bangs=new THREE.Mesh(new THREE.BoxGeometry(.23*headSc,.075,.065),hm);
+  bangs.position.set(0,headY+.085*headSc,.13*headSc);g.add(bangs);
+
+  // Eyes
+  var eGeo=new THREE.SphereGeometry(.024,8,8);
+  var eY=headY+.02,eZ=.115*headSc;
+  var le=new THREE.Mesh(eGeo,em);le.position.set(-eyeSp,eY,eZ);g.add(le);
+  var re=new THREE.Mesh(eGeo,em);re.position.set( eyeSp,eY,eZ);g.add(re);
+
+  // Mouth
+  var mth=new THREE.Mesh(new THREE.BoxGeometry(.062,.02,.02),new THREE.MeshLambertMaterial({color:0x5a2020}));
+  mth.position.set(0,headY-.058,.13*headSc);g.add(mth);
+
+  // Arms
+  var aGeo=new THREE.CylinderGeometry(.04,.034,armLen,8);
+  var lArm=new THREE.Mesh(aGeo,sk);lArm.position.set(-(torsoW/2+.065),1.22-armLen/2+.11,0);lArm.rotation.z=.1;g.add(lArm);
+  var rArm=new THREE.Mesh(aGeo,sk);rArm.position.set( torsoW/2+.065, 1.22-armLen/2+.11,0);rArm.rotation.z=-.1;g.add(rArm);
+
+  // Hands
+  var hGeo=new THREE.SphereGeometry(.042,8,8);
+  var lHand=new THREE.Mesh(hGeo,sk);lHand.position.set(-(torsoW/2+.065),1.22-armLen+.06,0);g.add(lHand);
+  var rHand=new THREE.Mesh(hGeo,sk);rHand.position.set( torsoW/2+.065, 1.22-armLen+.06,0);g.add(rHand);
+
+  // Legs
+  var lGeo=new THREE.CylinderGeometry(.057,.05,.62,8);
+  var lLeg=new THREE.Mesh(lGeo,bm);lLeg.position.set(-.1,.65,0);g.add(lLeg);
+  var rLeg=new THREE.Mesh(lGeo,bm);rLeg.position.set( .1,.65,0);g.add(rLeg);
+
+  // Shoes
+  var sGeo=new THREE.BoxGeometry(.13,.075,.21);
+  [-0.1,.1].forEach(function(x){var sh=new THREE.Mesh(sGeo,shoe);sh.position.set(x,.33,.045);g.add(sh);});
+
+  g.userData={
+    anom:anom,isAnom:anom>0,
+    lLeg:lLeg,rLeg:rLeg,lArm:lArm,rArm:rArm,head:head,
+    state:'walk',speed:.016,
+    sp1done:false,sp2done:false,
+    headY:headY,neckH:neckH
+  };
+  // Face toward +Z (toward player who is at z≈1.4; character spawns at far -z)
+  g.rotation.y=0;
+  return g;
+}
+
+// ======================================================
+//  PASSENGER DATA
+// ======================================================
+var NAMES=['Yamamoto','Sato','Tanaka','Suzuki','Kobayashi','Ito','Watanabe',
+           'Nakamura','Hayashi','Kimura','Saito','Matsumoto','Inoue','Kato','Yoshida'];
+var SKINS=[0xffcba4,0xf1c27d,0xc68642,0x8d5524];
+
+// Normal walk speech — two lines (approach + near)
+var NORM_W=[
+  ['Boa noite.','Poderia me levar ao andar {f}?'],
+  ['Desculpe o incomodo.','Andar {f}, por favor.'],
+  ['Trabalhando até tarde?','Andar {f}, obrigado.'],
+  ['Oh, ótimo, um elevador.','Preciso do andar {f}.'],
+  ['Com licença.','Andar {f}, se não se importar.'],
+];
+
+// Anomaly walk speech — incoherent / logically wrong
+var ANOM_W=[
+  ['j jaslbfobab.','... andar {f}.'],
+  ['O fogo queima como a neve.','Leve-me para onde começa o fim.'],
+  ['Eu nunca estive aqui antes.','Mas conheço cada rachadura nesse teto.'],
+  ['Não faça barulho.','Ele ouve quando você faz barulho.'],
+  ['Tem alguém atrás de você.','Não olhe.'],
+  ['...','...você está lendo isso?'],
+  ['Hhhhhh.','... {f}...'],
+  ['Os mortos não precisam de elevadores.','Mas eu vou pedir mesmo assim. Andar {f}.'],
+  ['Você me conhece.','Não, espera. Você me conhecerá.'],
+  ['O {f} desce quando você sobe.','Mas tudo bem.'],
+];
+
+// Full dialog — normal
+var NORM_D=[
+  '"{name}. Andar {f}, por favor."',
+  '"Boa noite. Poderia me levar ao {f}º andar?"',
+  '"Com licença. O {f}º andar, obrigado."',
+];
+
+// Full dialog — anomaly
+var ANOM_D=[
+  '"... {f}. Só isso."',
+  '"Leve-me ao {f}. O elevador sabe o caminho."',
+  '"Eu preciso ir ao {f}. Ou talvez você precise."',
+  '"j j j... {f}... j j j."',
+  '"O {f}º anda por conta própria às vezes."',
+  '"Não importa onde. Mas diga que é o {f}."',
+  '"Você ouviu isso? ... {f}º andar."',
+  '"mbjkks{f}kkksshh."',
+  '"Todos vão para o {f} eventualmente."',
+];
+
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+function fmt(s,data){return s.replace(/\{(\w+)\}/g,function(m,k){return data[k]!==undefined?data[k]:m;});}
+
+function genPassengers(){
+  var all=[];
+  for(var d=0;d<7;d++){
+    var day=[];
+    for(var i=0;i<5;i++){
+
+      var isAnom=Math.random()<.6; // 60%
+
+      var at=0;
+
+      if(isAnom){
+        // mistura mais realista
+        var r=Math.random();
+        if(r<.25) at=ANOM.SPEECH;        // parece normal
+        else if(r<.45) at=ANOM.NONE;     // 👈 invisível (só comportamento)
+        else at=Math.floor(Math.random()*5)+1;
+      }
+
+      var askM1=isAnom&&Math.random()<.25;
+      var floor=askM1?-1:Math.floor(Math.random()*5)+1;
+
+      var fStr=floor===-1?'-1':String(floor);
+      var name=pick(NAMES);
+
+      var wLines=isAnom?pick(ANOM_W):pick(NORM_W);
+      var dLine =isAnom?pick(ANOM_D):pick(NORM_D);
+
+      // 🧠 comportamento estranho (nova lógica)
+      var delayTalk = isAnom && Math.random()<.5 ? 2000+Math.random()*2000 : 0;
+      var fakeConfidence = isAnom && Math.random()<.4;
+
+      var data={f:fStr,name:name};
+
+      day.push({
+        name:name,
+        floor:floor,
+        isAnom:isAnom,
+        at:at,
+        skin:pick(SKINS),
+        female:Math.random()>.5,
+
+        wl0:fmt(wLines[0],data),
+        wl1:fmt(wLines[1]||wLines[0],data),
+        dlg:fmt(dLine,data),
+
+        delayTalk:delayTalk,
+        fakeConfidence:fakeConfidence
+      });
+    }
+    all.push(day);
+  }
+  return all;
+}
+
+// ======================================================
+//  SPEECH SUBTITLE
+// ======================================================
+var _spTimer=null;
+function showSpeech(name,text,isAnom,dur){
+  dur=dur||5000;
+  var el=document.getElementById('speech');
+  document.getElementById('sp-name').textContent=name.toUpperCase();
+  document.getElementById('sp-txt').textContent=text;
+  el.className=isAnom?'anom on':'on';
+  clearTimeout(_spTimer);
+  _spTimer=setTimeout(function(){el.classList.remove('on');},dur);
+}
+function hideSpeech(){
+  clearTimeout(_spTimer);
+  document.getElementById('speech').classList.remove('on');
+}
+
+// ======================================================
+//  GAME STATE
+// ======================================================
+var G={
+  phase:'MENU',
+  day:1,pi:0,anomCount:0,
+  corrLen:24,corrWid:3.2,
+  allPass:[],curPass:null,curChar:null,
+  pos:new THREE.Vector3(0,1.7,1.4),
+  yaw:0,pitch:0,locked:false,keys:{},
+  stepT:0,hbT:0,canTalk:false,caught:false,
+
+  pressBtn:function(v){
+    var p=this.curPass;if(!p)return;
+    hidePanels();
+    if(v==='close'){
+      if(p.isAnom)this.anomDoorClose();else this.nextPass();return;
+    }
+    if(v==='open'){
+      if(p.floor===-1)this.startRun(true);else this.nextPass();return;
+    }
+    // floor number
+    if(p.isAnom)this.startRun(false);else this.rideFloor(v);
+  },
+
+  rideFloor:function(floor){
+    setHint('Subindo ao '+floor+'º andar...');
+    hideSpeech();this.phase='RIDE';
+    elevSound(floor>3?'up':'down');
+    if(this.curChar){scene.remove(this.curChar);this.curChar=null;}
+    var self=this;
+    setTimeout(function(){ding();setHint('');self.nextPass();},3400);
+  },
+
+  startRun:function(hasAdvantage){
+    this.anomCount++;this.phase='RUN';
+    setTension(true);hideSpeech();
+    document.getElementById('vig').classList.add('on');
+    document.getElementById('alert').style.opacity='1';
+
+    // Place anomaly: with advantage it's still in corridor entrance; without, it's right at door
+    if(this.curChar){
+      this.curChar.userData.state='alerted'; // frozen-twitching for 3s
+      this.curChar.userData.alertTimer=3.0;
+      this.curChar.userData.chaseSpeed=.038+this.anomCount*.005;
+      this.curChar.position.set(0,0,hasAdvantage?-2.5:-0.2);
+    }
+
+    this.corrLen=Math.min(46,this.corrLen+6);
+    this.corrWid=Math.max(0.7,this.corrWid-.22);
+    var self=this;
+    setTimeout(function(){buildCorridor(self.corrLen,self.corrWid,self.anomCount);},80);
+
+    // Countdown hint 3→2→1→CORRA
+    var counts=['3','2','1'];
+    counts.forEach(function(n,i){
+      setTimeout(function(){
+        if(self.phase==='RUN')setHint('CORRA EM  '+n+'  SEGUNDO'+(n==='1'?'':'S')+'...');
+      },i*1000);
+    });
+    setTimeout(function(){
+      if(self.phase==='RUN')setHint('CORRA!  SHIFT + WASD até o outro elevador!');
+    },3000);
+  },
+
+  anomDoorClose:function(){
+    this.anomCount++;hideSpeech();ding();
+    setHint('Porta fechada a tempo.');setTension(false);
+    if(this.curChar){scene.remove(this.curChar);this.curChar=null;}
+    this.corrLen=Math.min(46,this.corrLen+5);
+    this.corrWid=Math.max(0.7,this.corrWid-.2);
+    buildCorridor(this.corrLen,this.corrWid,this.anomCount);
+    var self=this;
+    setTimeout(function(){setHint('');self.nextPass();},2600);
+  },
+
+  reachedElevB:function(){
+    this.phase='ESCAPE';setTension(false);
+    document.getElementById('vig').classList.remove('on');
+    document.getElementById('alert').style.opacity='0';
+    if(this.curChar){scene.remove(this.curChar);this.curChar=null;}
+    ding();setHint('Escapou. Retornando...');
+    var self=this;
+    setTimeout(function(){
+      flash();
+      setTimeout(function(){
+        self.pos.set(0,1.7,1.4);self.yaw=Math.PI;self.pitch=0;
+        setHint('');self.nextPass();
+      },500);
+    },2200);
+  },
+
+  nextPass:function(){
+    this.pi++;
+    if(this.pi>=5){this.endDay();return;}
+    this.phase='WAIT';updateHUD();
+    var self=this;
+    setTimeout(function(){spawnPass();},1600);
+  },
+
+  endDay:function(){
+    if(this.curChar){scene.remove(this.curChar);this.curChar=null;}
+    if(this.day>=7){showEnding();return;}
+    this.day++;this.pi=0;updateHUD();
+    showOverlayMsg('DIA '+this.day,'O turno continua...',function(){
+      G.phase='WAIT';
+      setTimeout(function(){spawnPass();},1500);
+    });
+  },
+
+  die:function(){
+    if(this.caught)return;
+    this.caught=true;this.phase='DEAD';
+    setTension(false);document.exitPointerLock();hideSpeech();
+    showOverlayMsg('CAPTURADO','Dia '+this.day+' — Passageiro '+(this.pi+1),null,true);
+  }
+};
+
+// ======================================================
+//  SPAWN PASSENGER
+// ======================================================
+function spawnPass(){
+  if(G.pi>=5){G.endDay();return;}
+  var p=G.allPass[G.day-1][G.pi];
+  G.curPass=p;
+  if(G.curChar){scene.remove(G.curChar);G.curChar=null;}
+
+  // SPEECH anomaly = normal body
+  var physAnom=p.at===ANOM.SPEECH?ANOM.NONE:p.at;
+  var ch=buildHuman({skin:p.skin,anom:physAnom,female:p.female});
+  // velocidade dinâmica (chegar em ~4s)
+  var dist = Math.abs((-0.2)-(elevBZ+2.6));
+  ch.userData.speed = dist / (4 / 0.016);
+
+  // Spawn at far end of corridor
+  // elevBZ is negative (far end). Character must walk toward player at z≈1.4.
+  // Spawn just past elevator B opening (slightly inside corridor from B side).
+  ch.position.set(0,0,elevBZ+2.6);
+
+  // Character faces +Z = toward player (rotation.y=0 is default)
+  ch.rotation.y=0;
+
+  scene.add(ch);
+  G.curChar=ch;
+  G.phase='WALKING';
+  G.canTalk=false;
+  setHint('');
+  updateHUD();
+
+  // First speech line shortly after spawn
+  var capturedCh=ch;
+  setTimeout(function(){
+  if(G.curChar===capturedCh&&G.phase==='WALKING'){
+    setTimeout(function(){
+      showSpeech(p.name,p.wl0,p.isAnom,4200);
+    },p.delayTalk||0);
+  }
+},800); 
+}
+
+// ======================================================
+//  UI
+// ======================================================
+function setHint(t){document.getElementById('hint').textContent=t;}
+function flash(){
+  var f=document.getElementById('flash');
+  f.style.opacity='1';setTimeout(function(){f.style.opacity='0';},110);
+}
+function updateHUD(){
+  document.getElementById('d').textContent=G.day;
+  document.getElementById('p').textContent=G.pi+1;
+}
+function hidePanels(){
+  document.getElementById('dlg').classList.remove('on');
+  document.getElementById('panel').classList.remove('on');
+}
+
+function openDialog(){
+  var p=G.curPass;if(!p)return;
+  G.phase='DIALOG';hideSpeech();
+  document.getElementById('dlg-name').textContent=p.name.toUpperCase();
+  document.getElementById('dlg-txt').textContent=p.dlg;
+  document.getElementById('dlg').classList.add('on');
+  setTimeout(function(){document.getElementById('panel').classList.add('on');},800);
+  if(G.locked)document.exitPointerLock();
+}
+
+function closeDialog(){
+  hidePanels();
+  G.phase=G.curChar?'WAITING':'WAIT';
+  if(!G.locked)canvas.requestPointerLock();
+}
+
+function showOverlayMsg(title,sub,cb,withRestart){
+  var ov=document.getElementById('overlay');
+  ov.innerHTML='<div class="scr"><h1>'+title+'</h1><p>'+sub+'</p>'+(withRestart?'<button onclick="location.reload()">TENTAR NOVAMENTE</button>':'')+'</div>';
+  ov.classList.remove('h');
+  if(cb&&!withRestart)setTimeout(function(){ov.classList.add('h');cb();},2600);
+}
+
+function showEnding(){
+  G.phase='END';document.exitPointerLock();
+  var ov=document.getElementById('overlay');ov.classList.remove('h');
+  var sc=document.createElement('div');sc.className='scr';
+  ov.innerHTML='';ov.appendChild(sc);
+  var lines=[
+    {h:'DIA 7',p:'Turno encerrado.'},
+    {h:'',p:'O andar estava vazio.'},
+    {h:'',p:'Não havia ninguém.'},
+    {h:'',p:'Ele não estava lá de verdade.'},
+    {h:'',p:'Era apenas um sonho.',x:'<p class="sub" style="margin-top:32px;color:#2a2a2a">OPERADOR DE ELEVADOR — ANDAR 0</p>'}
+  ];
+  var i=0;
+  function next(){
+    if(i>=lines.length)return;
+    var l=lines[i++];
+    sc.innerHTML=(l.h?'<h1 style="font-size:1.9rem;letter-spacing:.4em">'+l.h+'</h1>':'')
+      +'<p style="color:#444;font-size:.9rem">'+l.p+'</p>'+(l.x||'');
+    setTimeout(next,3400);
+  }
+  next();
+}
+
+// ======================================================
+//  INPUT
+// ======================================================
+document.addEventListener('keydown',function(e){
+  G.keys[e.code]=true;
+  if(e.code==='KeyE'){
+    if(G.phase==='DIALOG'){closeDialog();return;}
+    if(G.canTalk&&G.phase==='WAITING')openDialog();
+  }
+});
+document.addEventListener('keyup',function(e){delete G.keys[e.code];});
+
+canvas.addEventListener('click',function(){
+  if(G.phase==='MENU')return;
+  if(!G.locked){canvas.requestPointerLock();startAmb();}
+});
+document.addEventListener('pointerlockchange',function(){G.locked=document.pointerLockElement===canvas;});
+document.addEventListener('mousemove',function(e){
+  if(!G.locked)return;
+  G.yaw-=e.movementX*.0022;
+  G.pitch=Math.max(-1.3,Math.min(1.3,G.pitch-e.movementY*.0022));
+});
+
+// ======================================================
+//  GAME START
+// ======================================================
+document.getElementById('btn-start').addEventListener('click',function(){
+  G.allPass=genPassengers();
+  G.day=1;G.pi=0;G.anomCount=0;
+  G.corrLen=24;G.corrWid=2.0;G.caught=false;
+  G.phase='WAIT';
+  document.getElementById('overlay').classList.add('h');
+  document.getElementById('hud').classList.remove('h');
+  buildElevatorA();
+  buildCorridor(G.corrLen,G.corrWid,0);
+  G.pos.set(0,1.7,1.4);
+  G.yaw=Math.PI; // player faces the open door (looking down the corridor)
+  G.pitch=0;
+  updateHUD();
+  startAmb();
+  setTimeout(function(){spawnPass();},2000);
+});
+
+// ======================================================
+//  MAIN LOOP
+// ======================================================
+var clock=new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  var dt=Math.min(clock.getDelta(),.05);
+  var t=clock.getElapsedTime();
+  tickPlayer(dt,t);
+  tickCharacter(dt,t);
+  tickLights(t);
+  cam.position.copy(G.pos);
+  cam.rotation.y=G.yaw;
+  cam.rotation.x=G.pitch;
+  renderer.render(scene,cam);
+}
+
+// ── PLAYER ────────────────────────────────────────────────────────────────
+function tickPlayer(dt,t){
+  if(!G.locked)return;
+
+  // WASD blocked in these phases — mouse look ALWAYS works
+  var FROZEN=['MENU','DIALOG','RIDE','DEAD','END','WAITING','WAIT','WALKING'];
+  var canMove=FROZEN.indexOf(G.phase)===-1;
+
+  if(canMove){
+    var run=G.keys['ShiftLeft']||G.keys['ShiftRight'];
+    var sp=run?.105:.046;
+    var fw=new THREE.Vector3(-Math.sin(G.yaw),0,-Math.cos(G.yaw));
+    var rt=new THREE.Vector3( Math.cos(G.yaw),0,-Math.sin(G.yaw));
+    var moved=false;
+    if(G.keys['KeyW']||G.keys['ArrowUp'])   {G.pos.addScaledVector(fw, sp);    moved=true;}
+    if(G.keys['KeyS']||G.keys['ArrowDown']) {G.pos.addScaledVector(fw,-sp*.85);moved=true;}
+    if(G.keys['KeyA']||G.keys['ArrowLeft']) {G.pos.addScaledVector(rt,-sp*.8); moved=true;}
+    if(G.keys['KeyD']||G.keys['ArrowRight']){G.pos.addScaledVector(rt, sp*.8); moved=true;}
+    if(moved){
+      G.stepT-=dt;
+      if(G.stepT<=0){stepSnd(run?.25:.17);G.stepT=run?.22:.42;}
+      G.pos.y=1.7+Math.sin(t*8.5*(run?1.8:1))*.022;
+    }else G.pos.y=1.7;
+    G.pos.x=Math.max(-1.05,Math.min(1.05,G.pos.x));
+    G.pos.z=Math.max(elevBZ-.2,Math.min(2.2,G.pos.z));
+    if(G.phase==='RUN'&&G.pos.z<=elevBZ+1.6)G.reachedElevB();
+  } else {
+    // Locked inside elevator — snap to center
+    G.pos.set(0,1.7,1.4);
+  }
+
+  // Heartbeat when chased
+  if(G.phase==='RUN'&&G.curChar){
+    var d=G.pos.distanceTo(G.curChar.position);
+    G.hbT-=dt;
+    if(G.hbT<=0){heartbeat();G.hbT=Math.max(.22,Math.min(.95,d*.09));}
+  }
+}
+
+// ── CHARACTER ─────────────────────────────────────────────────────────────
+function tickCharacter(dt,t){
+  var ch=G.curChar;if(!ch)return;
+  var ud=ch.userData;
+  var wt=t*5;
+
+  // WALK toward player
+  // Character front is +Z. Player is at z≈1.4. Character spawns at z≈elevBZ+2.6 (negative).
+  // To walk toward player: increase Z (ch.position.z +=).
+  if(ud.state==='walk'){
+    var TARGET=-0.2; // stop just at elevator door threshold
+    if(ch.position.z<TARGET){
+      ch.position.z+=ud.speed; // move toward +Z = toward player ✓
+
+      // Walk animation
+      var wv=Math.sin(wt)*.34;
+      ud.lLeg.rotation.x= wv;ud.rLeg.rotation.x=-wv;
+      ud.lArm.rotation.x=-wv*.5;ud.rArm.rotation.x= wv*.5;
+
+      // Mid-point speech
+      var p=G.curPass;
+      if(p&&!ud.sp2done){
+        var totalDist=Math.abs((elevBZ+2.6)-TARGET);
+        var walked=Math.abs(ch.position.z-(elevBZ+2.6));
+        var progress=walked/totalDist;
+        if(progress > (p.fakeConfidence ? 0.75 : 0.55)){
+          ud.sp2done=true;
+          showSpeech(p.name,p.wl1,p.isAnom,4500);
+          if(p.isAnom)setTimeout(creak,700);
+        }
+      }
+
+    } else {
+      // Arrived at elevator door
+      ch.position.z=TARGET;
+      ud.state='idle';
+      G.phase='WAITING';
+      G.canTalk=true;
+      setHint('[E] Falar com o passageiro');
+
+      // Short pause then arrival murmur
+      var capturedCh=ch,capturedP=G.curPass;
+      setTimeout(function(){
+        if(G.curChar===capturedCh&&G.phase==='WAITING'&&capturedP)
+          showSpeech(capturedP.name,'...',capturedP.isAnom,2800);
+      },600);
+      if(ud.isAnom)setTimeout(creak,1600);
+    }
+  }
+
+  // IDLE sway
+  if(ud.state==='idle'){
+    ch.position.x=Math.sin(t*.65)*.016;
+    if(ud.anom===ANOM.TILT)ud.head.rotation.z=.38+Math.sin(t*1.9)*.055;
+  }
+
+  // ALERTED — frozen twitch for 3 seconds then starts chasing
+  if(ud.state==='alerted'){
+    ud.alertTimer=(ud.alertTimer||0)-dt;
+    // Jerky twitch anim
+    var tw=Math.sin(t*22)*(.18+Math.random()*.04);
+    ud.lArm.rotation.x=tw*1.1; ud.rArm.rotation.x=-tw*.9;
+    ud.lLeg.rotation.x=tw*.3;  ud.rLeg.rotation.x=-tw*.3;
+    ud.head.rotation.z=Math.sin(t*18)*.08;
+    ud.head.rotation.x=Math.sin(t*14)*.06;
+    // Face player during alert
+    var dx=G.pos.x-ch.position.x,dz=G.pos.z-ch.position.z;
+    ch.rotation.y=Math.atan2(dx,dz)+Math.PI;
+    if(ud.alertTimer<=0){
+      ud.state='chase';
+      ud.speed=ud.chaseSpeed||.04;
+      // Scream tone
+      tone(220,.12,'sawtooth',.18);
+      tone(110,.3,'sawtooth',.12,.08);
+    }
+  }
+
+  // CHASE
+  if(ud.state==='chase'){
+    var dir=new THREE.Vector3(G.pos.x-ch.position.x,0,G.pos.z-ch.position.z);
+    var dist=dir.length();
+    if(dist<1.05){G.die();return;}
+    dir.normalize();
+    ch.position.addScaledVector(dir,ud.speed);
+    ch.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI;
+    var cv=Math.sin(t*10)*.5;
+    ud.lLeg.rotation.x= cv;ud.rLeg.rotation.x=-cv;
+    ud.lArm.rotation.x=-cv*.65;ud.rArm.rotation.x= cv*.65;
+    if(ud.anom===ANOM.TILT)ud.head.rotation.z=.38+Math.sin(t*15)*.16;
+    if(ud.anom===ANOM.NECK)ud.head.rotation.x=Math.sin(t*13)*.14;
+  }
+}
+
+// ── LIGHTS ────────────────────────────────────────────────────────────────
+function tickLights(t){
+  flickerLights.forEach(function(l){
+    if(l.flicker){
+      l.light.intensity=G.phase==='RUN'
+        ?l.baseInt*(Math.random()<.07?0:.3+Math.random()*.9)
+        :l.baseInt*(.88+Math.sin(t*240)*.07);
+    }else if(G.phase==='RUN'){
+      l.light.intensity=Math.max(.06,l.baseInt*(1-Math.random()*.22));
+    }else{
+      l.light.intensity=l.baseInt;
+    }
+  });
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+buildElevatorA();
+buildCorridor(24,2.0,0);
+G.pos.set(0,1.7,1.4);
+G.yaw=Math.PI;
+animate();
+</script>
+</body>
+</html>
