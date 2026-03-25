@@ -149,9 +149,6 @@ function startAmb(){
   _amb=ac.createOscillator();var g=ac.createGain();
   _amb.connect(g);g.connect(ac.destination);_amb.type='sine';_amb.frequency.value=36;
   g.gain.value=.038;_amb.start();
-  var o2=ac.createOscillator(),g2=ac.createGain();
-  o2.connect(g2);g2.connect(ac.destination);o2.type='sawtooth';o2.frequency.value=5800;
-  g2.gain.value=.0032;o2.start();
 }
 function setTension(hi){if(_amb)_amb.frequency.value=hi?60:36;}
 
